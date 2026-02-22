@@ -1,0 +1,11 @@
+{
+  "name": "sound-engine",
+  "version": "0.1.0",
+  "description": "Browser-based music engine — synthesize, sequence, and perform with code",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.16.0"
+  }
+}
