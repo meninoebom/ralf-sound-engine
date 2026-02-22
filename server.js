@@ -57,6 +57,15 @@ const server = http.createServer((req, res) => {
   if (req.url === "/" || req.url === "/index.html") {
     res.writeHead(200, { "Content-Type": "text/html" });
     fs.createReadStream(htmlPath).pipe(res);
+  } else if (req.url === "/perf-list") {
+    // List available .perf.json files
+    const files = fs.readdirSync(__dirname).filter(f => f.endsWith(".perf.json"));
+    const list = files.map(f => {
+      const data = JSON.parse(fs.readFileSync(path.join(__dirname, f), "utf-8"));
+      return { file: f, name: data.name || f, bpm: data.bpm };
+    });
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(list));
   } else if (req.url.startsWith("/perf")) {
     // Support ?file=my-song.perf.json to load different configs
     const url = new URL(req.url, `http://localhost:${HTTP_PORT}`);

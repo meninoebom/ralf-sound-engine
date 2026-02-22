@@ -20,21 +20,17 @@ def separate(song_path: Path, output_dir: Path, model: str = DEMUCS_MODEL) -> di
         raise FileNotFoundError(f"Song not found: {song_path}")
 
     # Demucs outputs to: output_dir/model_name/track_name/stem.wav
-    # We use --filename to flatten the structure
+    # We use the default filename pattern and look in the right place.
+    cmd = [
+        sys.executable, "-m", "demucs",
+        "--name", model,
+        "--out", str(output_dir),
+        "--float32",
+        str(song_path),
+    ]
+
     try:
-        subprocess.run(
-            [
-                sys.executable, "-m", "demucs",
-                "--name", model,
-                "--out", str(output_dir),
-                "--filename", "{stem}.{ext}",
-                "--mp3" if song_path.suffix == ".mp3" else "--float32",
-                str(song_path),
-            ],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
+        subprocess.run(cmd, check=True, capture_output=True, text=True)
     except FileNotFoundError:
         raise RuntimeError(
             "Demucs is not installed.\n"
@@ -44,8 +40,7 @@ def separate(song_path: Path, output_dir: Path, model: str = DEMUCS_MODEL) -> di
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"Demucs failed:\n{e.stderr}")
 
-    # Locate output stems
-    # Demucs puts them in output_dir/model_name/song_name_without_ext/
+    # Demucs puts stems in output_dir/model_name/track_name/stem.wav
     song_name = song_path.stem
     stems_dir = output_dir / model / song_name
 

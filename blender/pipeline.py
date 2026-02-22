@@ -68,7 +68,7 @@ def blend(
             stem_path = stems[stem_name]
             log(f"  Analyzing {stem_name}...")
 
-            onsets = detect_onsets(stem_path)
+            onsets = detect_onsets(stem_path, is_drums=(stem_name == "drums"))
             log(f"    {len(onsets)} onsets detected")
 
             slices = slice_stem(

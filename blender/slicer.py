@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import soundfile as sf
 
-from .defaults import MIN_SLICE_DURATION_MS, FADE_OUT_MS
+from .defaults import MIN_SLICE_DURATION_MS, FADE_OUT_MS, MAX_SLICES_PER_STEM
 
 
 @dataclass
@@ -23,6 +23,7 @@ def slice_stem(
     stem_name: str,
     min_duration_ms: int = MIN_SLICE_DURATION_MS,
     fade_out_ms: int = FADE_OUT_MS,
+    max_slices: int = MAX_SLICES_PER_STEM,
 ) -> list[Slice]:
     """Slice a stem WAV at onset points and save individual samples.
 
@@ -79,5 +80,15 @@ def slice_stem(
 
         duration_ms = len(chunk) / sr * 1000
         slices.append(Slice(path=out_path, duration_ms=duration_ms, start_time=start_sec))
+
+    # Cap at max_slices, keeping the longest (most musically useful)
+    if len(slices) > max_slices:
+        slices.sort(key=lambda s: s.duration_ms, reverse=True)
+        # Delete files for discarded slices
+        for discarded in slices[max_slices:]:
+            discarded.path.unlink(missing_ok=True)
+        slices = slices[:max_slices]
+        # Re-sort by start time for sequential numbering
+        slices.sort(key=lambda s: s.start_time)
 
     return slices

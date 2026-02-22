@@ -105,6 +105,14 @@
   <span id="ws-label">Connecting...</span>
 </div>
 
+<div style="display:flex; align-items:center; gap:12px; margin-bottom:12px;">
+  <select id="perf-select" style="font-size:14px; padding:6px 12px; background:#222; color:#eee; border:1px solid #555; border-radius:6px;">
+    <option>Loading...</option>
+  </select>
+  <button id="load-btn" onclick="switchPerformance()" style="font-size:13px; padding:6px 16px; background:#444; color:#eee; border:none; border-radius:6px; cursor:pointer;">Load</button>
+</div>
+<div id="perf-name" style="font-size:14px; color:#4f4; margin-bottom:12px; font-weight:600;"></div>
+
 <button id="start-btn" onclick="togglePlayback()">START</button>
 
 <div class="status">
@@ -143,8 +151,9 @@ let perfSwingSub = "16n";
 // Map from track index → Tone.Player for sample tracks
 const samplePlayers = {};
 
-async function loadPerformance() {
-  const res = await fetch("/perf");
+async function loadPerformance(perfFile) {
+  const url = perfFile ? `/perf?file=${encodeURIComponent(perfFile)}` : "/perf";
+  const res = await fetch(url);
   perfConfig = await res.json();
 
   gestures = perfConfig.gestures;
@@ -991,8 +1000,38 @@ async function togglePlayback() {
   updateUI();
 }
 
-// Boot: load performance config, then connect
+// Populate the performance config dropdown
+async function loadPerfList() {
+  try {
+    const res = await fetch("/perf-list");
+    const list = await res.json();
+    const sel = document.getElementById("perf-select");
+    sel.innerHTML = "";
+    for (const item of list) {
+      const opt = document.createElement("option");
+      opt.value = item.file;
+      opt.textContent = `${item.name} (${item.bpm} BPM)`;
+      sel.appendChild(opt);
+    }
+  } catch (e) {
+    console.warn("Could not load perf list:", e);
+  }
+}
+
+async function switchPerformance() {
+  const file = document.getElementById("perf-select").value;
+  if (!file) return;
+  // Stop if playing
+  if (playing) stopPlaying();
+  // Reload with new config
+  await loadPerformance(file);
+  document.getElementById("perf-name").textContent = perfConfig.name || file;
+}
+
+// Boot: load perf list, load default config, connect
+loadPerfList();
 loadPerformance().then(() => {
+  document.getElementById("perf-name").textContent = perfConfig.name || "";
   connectWs();
 });
 </script>

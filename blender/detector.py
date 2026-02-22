@@ -19,13 +19,28 @@ def detect_bpm(audio_path: Path) -> float:
     return round(float(tempo), 1)
 
 
-def detect_onsets(audio_path: Path, sr: int = None) -> list[float]:
+def detect_onsets(audio_path: Path, is_drums: bool = False) -> list[float]:
     """Detect onset times in an audio file.
 
-    Returns list of onset times in seconds.
+    Uses more sensitive settings for drums, less sensitive for melodic stems
+    to avoid over-slicing piano/vocal/bass content.
     """
-    y, sr = librosa.load(str(audio_path), sr=sr)
-    onset_frames = librosa.onset.onset_detect(y=y, sr=sr, units="frames")
+    y, sr = librosa.load(str(audio_path), sr=None)
+
+    if is_drums:
+        # Drums: default sensitivity works well
+        onset_frames = librosa.onset.onset_detect(y=y, sr=sr, units="frames")
+    else:
+        # Melodic content: raise the detection threshold to only catch
+        # significant note onsets, not every subtle variation
+        onset_env = librosa.onset.onset_strength(y=y, sr=sr)
+        onset_frames = librosa.onset.onset_detect(
+            y=y, sr=sr, units="frames",
+            onset_envelope=onset_env,
+            delta=0.3,       # Higher threshold (default ~0.07)
+            wait=15,         # Min frames between onsets (~350ms at 22050/512)
+        )
+
     onset_times = librosa.frames_to_time(onset_frames, sr=sr)
     return onset_times.tolist()
 

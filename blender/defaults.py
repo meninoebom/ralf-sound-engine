@@ -5,8 +5,9 @@ DEMUCS_MODEL = "htdemucs"
 STEM_NAMES = ["drums", "bass", "vocals", "other"]
 
 # Onset detection
-MIN_SLICE_DURATION_MS = 100  # Discard slices shorter than this
+MIN_SLICE_DURATION_MS = 500  # Discard slices shorter than this (was 100, too many micro-slices)
 FADE_OUT_MS = 10             # Fade-out to prevent clicks at slice boundaries
+MAX_SLICES_PER_STEM = 30     # Safety cap — keep the best N slices per stem
 
 # Drum categorization thresholds (spectral centroid in Hz)
 KICK_CENTROID_MAX = 500
