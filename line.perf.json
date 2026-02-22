@@ -1,0 +1,764 @@
+{
+  "version": "0.2",
+  "name": "line (Blended)",
+  "bpm": 143.6,
+  "swing": 0,
+  "swing_subdivision": "16n",
+  "tracks": [],
+  "gestures": {
+    "/gesture/1": {
+      "name": "pull back",
+      "streams": {
+        "energy_down": 1,
+        "all_movement": 1
+      },
+      "stacks": {
+        "total_moves": 1,
+        "pull_back_streak": 1
+      },
+      "intents": [
+        "strip_energy"
+      ],
+      "signals": [
+        "stop"
+      ]
+    },
+    "/gesture/2": {
+      "name": "push energy",
+      "streams": {
+        "energy_up": 1,
+        "all_movement": 1
+      },
+      "stacks": {
+        "total_moves": 1,
+        "push_streak": 1
+      },
+      "intents": [
+        "add_energy"
+      ],
+      "signals": [
+        "start"
+      ]
+    },
+    "/gesture/3": {
+      "name": "structure shift",
+      "streams": {
+        "structure_rate": 1,
+        "all_movement": 1
+      },
+      "stacks": {
+        "total_moves": 1,
+        "structure_count": 1
+      },
+      "intents": [
+        "shift_structure"
+      ],
+      "signals": []
+    }
+  },
+  "streams": {
+    "energy_down": {
+      "window_ms": 5000,
+      "thresholds": [
+        {
+          "above": 6,
+          "action": {
+            "intent": "frantic_strip"
+          }
+        }
+      ]
+    },
+    "energy_up": {
+      "window_ms": 5000,
+      "thresholds": [
+        {
+          "above": 6,
+          "action": {
+            "intent": "explosive_build"
+          }
+        }
+      ]
+    },
+    "structure_rate": {
+      "window_ms": 5000,
+      "thresholds": [
+        {
+          "above": 4,
+          "action": {
+            "intent": "total_reset"
+          }
+        }
+      ]
+    },
+    "all_movement": {
+      "window_ms": 5000,
+      "thresholds": [
+        {
+          "above": 10,
+          "action": {
+            "intent": "peak_frenzy"
+          }
+        }
+      ]
+    }
+  },
+  "stacks": {
+    "total_moves": {
+      "triggers": [
+        {
+          "at": 5,
+          "action": {
+            "intent": "minor_shift"
+          },
+          "reset": false
+        },
+        {
+          "at": 15,
+          "action": {
+            "intent": "breakthrough"
+          },
+          "reset": true
+        }
+      ]
+    },
+    "pull_back_streak": {
+      "triggers": [
+        {
+          "at": 5,
+          "action": {
+            "intent": "full_breakdown"
+          },
+          "reset": true
+        }
+      ]
+    },
+    "push_streak": {
+      "triggers": [
+        {
+          "at": 5,
+          "action": {
+            "intent": "scene_advance"
+          },
+          "reset": true
+        }
+      ]
+    },
+    "structure_count": {
+      "triggers": [
+        {
+          "at": 3,
+          "action": {
+            "intent": "structure_payoff"
+          },
+          "reset": true
+        }
+      ]
+    }
+  },
+  "intents": {
+    "strip_energy": [
+      {
+        "action": "scene_down",
+        "weight": 3
+      },
+      {
+        "action": "filter_sweep",
+        "args": {
+          "freq": 300,
+          "duration": 3000
+        },
+        "weight": 2
+      },
+      {
+        "action": "hush_master",
+        "args": {
+          "drop": 0.4,
+          "duration": 2500
+        },
+        "weight": 1
+      }
+    ],
+    "add_energy": [
+      {
+        "action": "scene_up",
+        "weight": 3
+      },
+      {
+        "action": "trigger_hook",
+        "weight": 2
+      },
+      {
+        "action": "trigger_sample",
+        "args": {
+          "track": 13
+        },
+        "weight": 2
+      },
+      {
+        "action": "trigger_sample",
+        "args": {
+          "track": 14
+        },
+        "weight": 2
+      },
+      {
+        "action": "trigger_sample",
+        "args": {
+          "track": 15
+        },
+        "weight": 2
+      },
+      {
+        "action": "trigger_sample",
+        "args": {
+          "track": 16
+        },
+        "weight": 2
+      },
+      {
+        "action": "trigger_sample",
+        "args": {
+          "track": 17
+        },
+        "weight": 2
+      }
+    ],
+    "shift_structure": [
+      {
+        "action": "swap_variant",
+        "weight": 3
+      },
+      {
+        "action": "breakdown",
+        "args": {
+          "duration": 6000
+        },
+        "weight": 2
+      },
+      {
+        "action": "trigger_hook",
+        "weight": 1
+      }
+    ],
+    "frantic_strip": [
+      {
+        "action": "scene_down",
+        "weight": 2
+      },
+      {
+        "action": "breakdown",
+        "args": {
+          "duration": 8000
+        },
+        "weight": 2
+      },
+      {
+        "action": "hush_master",
+        "args": {
+          "drop": 0.6,
+          "duration": 4000
+        },
+        "weight": 1
+      }
+    ],
+    "explosive_build": [
+      {
+        "action": "scene_up",
+        "weight": 2
+      },
+      {
+        "action": "trigger_hook",
+        "weight": 2
+      },
+      {
+        "action": "bass_drop",
+        "weight": 1
+      }
+    ],
+    "total_reset": [
+      {
+        "action": "fire_scene",
+        "args": {
+          "scene": 0
+        },
+        "weight": 2
+      },
+      {
+        "action": "bass_drop",
+        "weight": 1
+      }
+    ],
+    "peak_frenzy": [
+      {
+        "action": "fire_scene",
+        "args": {
+          "scene": 4
+        },
+        "weight": 2
+      },
+      {
+        "action": "trigger_sample",
+        "args": {
+          "track": 9
+        },
+        "weight": 1
+      },
+      {
+        "action": "trigger_sample",
+        "args": {
+          "track": 10
+        },
+        "weight": 1
+      },
+      {
+        "action": "trigger_sample",
+        "args": {
+          "track": 13
+        },
+        "weight": 1
+      },
+      {
+        "action": "trigger_sample",
+        "args": {
+          "track": 14
+        },
+        "weight": 1
+      },
+      {
+        "action": "trigger_sample",
+        "args": {
+          "track": 15
+        },
+        "weight": 1
+      },
+      {
+        "action": "trigger_sample",
+        "args": {
+          "track": 16
+        },
+        "weight": 1
+      },
+      {
+        "action": "trigger_sample",
+        "args": {
+          "track": 17
+        },
+        "weight": 1
+      }
+    ],
+    "minor_shift": [
+      {
+        "action": "trigger_accent",
+        "weight": 2
+      },
+      {
+        "action": "swap_variant",
+        "weight": 1
+      }
+    ],
+    "breakthrough": [
+      {
+        "action": "scene_up",
+        "weight": 3
+      },
+      {
+        "action": "trigger_hook",
+        "weight": 2
+      },
+      {
+        "action": "bass_drop",
+        "weight": 1
+      }
+    ],
+    "full_breakdown": [
+      {
+        "action": "fire_scene",
+        "args": {
+          "scene": 0
+        },
+        "weight": 2
+      },
+      {
+        "action": "breakdown",
+        "args": {
+          "duration": 10000
+        },
+        "weight": 2
+      }
+    ],
+    "scene_advance": [
+      {
+        "action": "scene_up",
+        "weight": 3
+      },
+      {
+        "action": "trigger_accent",
+        "weight": 1
+      }
+    ],
+    "structure_payoff": [
+      {
+        "action": "swap_variant",
+        "weight": 2
+      },
+      {
+        "action": "scene_up",
+        "weight": 2
+      },
+      {
+        "action": "trigger_hook",
+        "weight": 1
+      }
+    ]
+  },
+  "signals": {
+    "start": {
+      "action": "start_playing",
+      "condition": {
+        "state_equals": "stopped"
+      }
+    },
+    "stop": {
+      "action": "stop_playing",
+      "condition": {
+        "state_equals": "playing",
+        "min_elapsed_ms": 300000
+      }
+    }
+  },
+  "scenes": [
+    {
+      "name": "Bare",
+      "mutes": [],
+      "desc": "Active: texture"
+    },
+    {
+      "name": "Skeletal",
+      "mutes": [],
+      "desc": "Active: texture, harmonic_bed"
+    },
+    {
+      "name": "Groove",
+      "mutes": [],
+      "desc": "Active: foundation, groove, bass"
+    },
+    {
+      "name": "Full",
+      "mutes": [],
+      "desc": "Active: foundation, groove, bass, harmonic_bed"
+    },
+    {
+      "name": "Peak",
+      "mutes": [],
+      "desc": "Active: foundation, groove, bass, harmonic_bed, texture"
+    }
+  ],
+  "sample_tracks": [
+    {
+      "name": "Foundation 1",
+      "file": "foundation-01.wav",
+      "color": "#f90",
+      "category": "foundation",
+      "volume": -6,
+      "sends": {
+        "reverb": -14,
+        "delay": -18
+      },
+      "mode": "loop",
+      "interval": "1m",
+      "muted_in_scenes": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "Foundation 2",
+      "file": "foundation-02.wav",
+      "color": "#f90",
+      "category": "foundation",
+      "volume": -6,
+      "sends": {
+        "reverb": -14,
+        "delay": -18
+      },
+      "mode": "loop",
+      "interval": "1m",
+      "muted_in_scenes": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "Groove 1",
+      "file": "groove-01.wav",
+      "color": "#fa0",
+      "category": "groove",
+      "volume": -8,
+      "sends": {
+        "reverb": -14,
+        "delay": -18
+      },
+      "mode": "loop",
+      "interval": "1m",
+      "muted_in_scenes": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "Groove 2",
+      "file": "groove-02.wav",
+      "color": "#fa0",
+      "category": "groove",
+      "volume": -8,
+      "sends": {
+        "reverb": -14,
+        "delay": -18
+      },
+      "mode": "loop",
+      "interval": "1m",
+      "muted_in_scenes": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "Bass 1",
+      "file": "bass-01.wav",
+      "color": "#4af",
+      "category": "bass",
+      "volume": -6,
+      "sends": {
+        "reverb": -14,
+        "delay": -18
+      },
+      "mode": "loop",
+      "interval": "1m",
+      "muted_in_scenes": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "Bass 2",
+      "file": "bass-02.wav",
+      "color": "#4af",
+      "category": "bass",
+      "volume": -6,
+      "sends": {
+        "reverb": -14,
+        "delay": -18
+      },
+      "mode": "loop",
+      "interval": "1m",
+      "muted_in_scenes": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "Bass 3",
+      "file": "bass-03.wav",
+      "color": "#4af",
+      "category": "bass",
+      "volume": -6,
+      "sends": {
+        "reverb": -14,
+        "delay": -18
+      },
+      "mode": "loop",
+      "interval": "1m",
+      "muted_in_scenes": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "Harmonic Bed 1",
+      "file": "harmonic_bed-01.wav",
+      "color": "#af4",
+      "category": "harmonic_bed",
+      "volume": -10,
+      "sends": {
+        "reverb": -14,
+        "delay": -18
+      },
+      "mode": "loop",
+      "interval": "8m",
+      "muted_in_scenes": [
+        0,
+        2
+      ]
+    },
+    {
+      "name": "Harmonic Bed 2",
+      "file": "harmonic_bed-02.wav",
+      "color": "#af4",
+      "category": "harmonic_bed",
+      "volume": -10,
+      "sends": {
+        "reverb": -14,
+        "delay": -18
+      },
+      "mode": "loop",
+      "interval": "1m",
+      "muted_in_scenes": [
+        0,
+        2
+      ]
+    },
+    {
+      "name": "Hook 1",
+      "file": "hook-01.wav",
+      "color": "#f4a",
+      "category": "hook",
+      "volume": -6,
+      "sends": {
+        "reverb": -14,
+        "delay": -18
+      },
+      "mode": "oneshot"
+    },
+    {
+      "name": "Hook 2",
+      "file": "hook-02.wav",
+      "color": "#f4a",
+      "category": "hook",
+      "volume": -6,
+      "sends": {
+        "reverb": -14,
+        "delay": -18
+      },
+      "mode": "oneshot"
+    },
+    {
+      "name": "Texture 1",
+      "file": "texture-01.wav",
+      "color": "#8af",
+      "category": "texture",
+      "volume": -14,
+      "sends": {
+        "reverb": -14,
+        "delay": -18
+      },
+      "mode": "loop",
+      "interval": "1m",
+      "muted_in_scenes": [
+        2,
+        3
+      ]
+    },
+    {
+      "name": "Texture 2",
+      "file": "texture-02.wav",
+      "color": "#8af",
+      "category": "texture",
+      "volume": -14,
+      "sends": {
+        "reverb": -14,
+        "delay": -18
+      },
+      "mode": "loop",
+      "interval": "1m",
+      "muted_in_scenes": [
+        2,
+        3
+      ]
+    },
+    {
+      "name": "Accent 1",
+      "file": "accent-01.wav",
+      "color": "#f84",
+      "category": "accent",
+      "volume": -6,
+      "sends": {
+        "reverb": -14,
+        "delay": -18
+      },
+      "mode": "oneshot"
+    },
+    {
+      "name": "Accent 2",
+      "file": "accent-02.wav",
+      "color": "#f84",
+      "category": "accent",
+      "volume": -6,
+      "sends": {
+        "reverb": -14,
+        "delay": -18
+      },
+      "mode": "oneshot"
+    },
+    {
+      "name": "Accent 3",
+      "file": "accent-03.wav",
+      "color": "#f84",
+      "category": "accent",
+      "volume": -6,
+      "sends": {
+        "reverb": -14,
+        "delay": -18
+      },
+      "mode": "oneshot"
+    },
+    {
+      "name": "Accent 4",
+      "file": "accent-04.wav",
+      "color": "#f84",
+      "category": "accent",
+      "volume": -6,
+      "sends": {
+        "reverb": -14,
+        "delay": -18
+      },
+      "mode": "oneshot"
+    },
+    {
+      "name": "Accent 5",
+      "file": "accent-05.wav",
+      "color": "#f84",
+      "category": "accent",
+      "volume": -6,
+      "sends": {
+        "reverb": -14,
+        "delay": -18
+      },
+      "mode": "oneshot"
+    }
+  ],
+  "starting_scene": 1,
+  "category_indices": {
+    "foundation": [
+      0,
+      1
+    ],
+    "groove": [
+      2,
+      3
+    ],
+    "bass": [
+      4,
+      5,
+      6
+    ],
+    "harmonic_bed": [
+      7,
+      8
+    ],
+    "hook": [
+      9,
+      10
+    ],
+    "texture": [
+      11,
+      12
+    ],
+    "accent": [
+      13,
+      14,
+      15,
+      16,
+      17
+    ]
+  }
+}
