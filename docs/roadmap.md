@@ -4,6 +4,48 @@
 
 A programmable music environment where you describe *what you want to happen* and the system makes it sound good. Reactive, performable, portable.
 
+## North Star: The Blender
+
+**"Feed it a track you love. Get back samples. Wire them to your body. Perform a live remix by dancing."**
+
+The full pipeline:
+
+```
+Song.mp3
+    │
+    ▼
+┌──────────────┐
+│   Blender    │  Python CLI tool
+│              │
+│  1. Demucs   │  ← stem separation (drums, bass, vocals, other)
+│  2. Librosa  │  ← onset detection + beat tracking
+│  3. Slicer   │  ← chop stems into individual samples
+│  4. Config   │  ← generate starter .perf.json
+└──────┬───────┘
+       │
+  samples/          ← kick-01.wav, snare-01.wav, vocal-phrase-01.wav, ...
+  blended.perf.json ← sample tracks + default gesture mappings
+       │
+       ▼
+┌──────────────┐
+│ Sound Engine │  ← load perf.json, play/trigger samples
+└──────┬───────┘
+       │
+  OSC from RALF Gesture Studio
+       │
+       ▼
+  Dancer performs live remix using trained movement vocabulary
+```
+
+**What makes this unique:** The gesture mapping layer. Lots of tools can split and slice audio. Nobody else connects the output to a dancer's body through a reactive four-system engine. The interesting part is the mapping between human movement and musical recombination.
+
+**MVP Blender** (~200 lines of Python):
+- `python blender.py "track.mp3"` → stems → slices → samples/ + starter perf.json
+- Dependencies: demucs, librosa, soundfile/pydub
+- Smart categorization: frequency content + duration heuristics to label kick/snare/vocal/texture
+- Tempo detection for loop sync (librosa.beat.beat_track)
+- Starter perf.json with drum hits as oneshot, phrases as loops, default gesture wiring
+
 ---
 
 ## Phase 1: Foundation (current)
