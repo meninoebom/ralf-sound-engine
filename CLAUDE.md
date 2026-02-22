@@ -74,6 +74,11 @@ Actions are the contract between performance config and runtime. Current vocabul
 | `bass_drop` | — | Silence → kick+bass slam back |
 | `tempo_shift` | `bpm`, `duration` | Temporary BPM change |
 | `trigger_sample` | `track` | Play a one-shot sample track |
+| `scene_up` | — | Advance one density layer toward Peak |
+| `scene_down` | — | Retreat one density layer toward Bare |
+| `trigger_hook` | — | Play random hook category sample |
+| `trigger_accent` | — | Play random accent category sample |
+| `swap_variant` | — | Cycle bass or harmonic_bed variant |
 
 New runtimes (Max4Live, etc.) implement this same vocabulary using their native tools.
 
@@ -85,14 +90,15 @@ Sample tracks are declared in the performance config and created dynamically at 
 
 ```json
 {
-  "name": "Break",
-  "file": "my-loop-120bpm.wav",
+  "name": "Foundation 1",
+  "file": "foundation-01.wav",
   "color": "#f90",
-  "volume": -10,
-  "sends": { "reverb": -18, "delay": -14 },
+  "category": "foundation",
+  "volume": -6,
+  "sends": { "reverb": -14, "delay": -18 },
   "mode": "loop",
-  "interval": "2m",
-  "muted_in_scenes": [0, 4]
+  "interval": "1m",
+  "muted_in_scenes": [0, 1]
 }
 ```
 
@@ -101,6 +107,7 @@ Sample tracks are declared in the performance config and created dynamically at 
 | `name` | yes | Display name in UI |
 | `file` | yes | Filename in `samples/` directory |
 | `color` | no | UI color (default: #aaa) |
+| `category` | no | Musical primitive category (foundation, groove, bass, etc.) |
 | `volume` | no | Channel volume in dB (default: -6) |
 | `sends` | no | `{ "reverb": dB, "delay": dB }` send levels |
 | `mode` | yes | `"loop"` (transport-synced repeat) or `"oneshot"` (action-triggered) |
@@ -113,37 +120,88 @@ Sample tracks are declared in the performance config and created dynamically at 
 
 ## The Blender
 
-Python CLI tool that turns any song into a performable remix:
+Python CLI tool that turns any song into a performable remix. Takes a song, separates stems via Demucs, slices at bar boundaries, selects 12-18 curated samples across 7 musical primitive categories, and generates a complete `.perf.json`.
 
 ```bash
-# Zero-config usage
-python -m blender ~/Music/my-song.mp3
+# Zero-config usage (needs .venv with deps)
+.venv/bin/python -m blender ~/Music/my-song.wav
 
 # Power user
-python -m blender song.mp3 --bpm 120 --stems drums,bass,vocals --verbose
+.venv/bin/python -m blender song.wav --bpm 120 --stems drums,bass,vocals --verbose
 ```
 
-**Pipeline:** Song → Demucs (stem separation) → Librosa (onset detection) → Slicer → Categorizer → .perf.json
+**Input format:** WAV recommended. M4A/MP3 may work but WAV avoids codec issues with Demucs. Convert with `ffmpeg -i song.m4a song.wav`.
 
-**Output:** Flat-named samples in `samples/` (`drums-kick-01.wav`, `bass-phrase-01.wav`, etc.) plus a complete, immediately playable `.perf.json` with gesture wiring, scenes, and intent pools.
+**Pipeline (v2):** Song → Demucs (stem separation) → Bar boundary detection (librosa beat tracking) → Bar-aligned slicing → 7-category primitive selection → .perf.json
 
-**Dependencies:** `pip install -r blender/requirements.txt` (demucs, librosa, soundfile, numpy)
+### 7 Musical Primitive Categories
+
+Instead of dumping hundreds of raw slices, the Blender selects the best representatives for each musical role:
+
+| Category | What | Count | Mode | Source |
+|----------|------|-------|------|--------|
+| **foundation** | Rhythmic anchor (kick patterns) | 1-2 | loop | drums: highest energy bars |
+| **groove** | Secondary rhythm (hats, shakers) | 1-2 | loop | drums: highest spectral centroid |
+| **bass** | Distinct bass phrases | 2-3 | loop | bass: spectrally diverse selection |
+| **harmonic_bed** | Chord/harmony backbone | 1-2 | loop | other: longest bars |
+| **hook** | Most recognizable fragment | 1-2 | oneshot | vocals: highest energy |
+| **texture** | Atmospheric, ambient | 1-2 | loop | all: lowest energy |
+| **accent** | Short punchy moments | 3-5 | oneshot | all: highest energy/duration ratio |
+
+**Total: 12-18 samples per song.** A dancer can mentally model this many things.
+
+### 5 Density-Layer Scenes
+
+Scenes control which categories are active. Start sparse, build UP:
+
+| Scene | Name | Active Categories |
+|-------|------|-------------------|
+| 0 | Bare | texture |
+| 1 | Skeletal | texture, harmonic_bed |
+| 2 | Groove | foundation, groove, bass |
+| 3 | Full | foundation, groove, bass, harmonic_bed |
+| 4 | Peak | foundation, groove, bass, harmonic_bed, texture |
+
+**Hook and accent are NEVER scene-controlled** — always gesture-triggered via `trigger_hook` and `trigger_accent` actions.
+
+**Starting scene: 1 (Skeletal)**
+
+### Blender-Specific Actions
+
+| Action | Description |
+|--------|-------------|
+| `scene_up` | Advance one density layer toward Peak |
+| `scene_down` | Retreat one density layer toward Bare |
+| `trigger_hook` | Play random hook sample |
+| `trigger_accent` | Play random accent sample |
+| `swap_variant` | Cycle to next bass or harmonic_bed variant |
+
+### File Structure
 
 ```
 blender/
 ├── __init__.py          # Package
-├── __main__.py          # CLI entry: python -m blender song.mp3
+├── __main__.py          # CLI entry: python -m blender song.wav
 ├── pipeline.py          # Orchestrates all stages
 ├── separator.py         # Demucs stem separation
-├── detector.py          # Onset detection + BPM (Librosa)
-├── slicer.py            # Chop stems at onset points
-├── categorizer.py       # Drum classification (spectral heuristics)
-├── config_generator.py  # Generate .perf.json
-├── defaults.py          # Centralized thresholds and defaults
+├── detector.py          # BPM + bar boundary detection (librosa)
+├── slicer.py            # Bar-aligned slicing with energy/centroid analysis
+├── categorizer.py       # 7-category musical primitive selection
+├── config_generator.py  # v2 perf.json: density scenes, category intents
+├── defaults.py          # Category limits, modes, colors, scene templates
 └── requirements.txt     # Python dependencies
 ```
 
-**Loading a blended song:** `http://localhost:8080` loads the default perf.json. To load a different one, the server supports `?file=` query param on the `/perf` endpoint.
+**Dependencies:** `pip install -r blender/requirements.txt` (demucs, librosa, soundfile, numpy). Use a venv: `.venv/bin/python`.
+
+**Loading a blended song:** Select from the dropdown at http://localhost:8080 and click Load. The server lists all `.perf.json` files via `/perf-list`.
+
+### Operational Learnings
+
+- **WAV input required.** Demucs can fail silently on m4a. Always convert with ffmpeg first.
+- **Bar-aligned > onset-based.** Onset detection on melodic content (piano, vocals) produces thousands of micro-slices. Bar-aligned slicing produces musically useful loops.
+- **Teardown matters.** When switching configs, all Tone.js audio nodes (players, channels, sends, loops) must be disposed before loading new ones. The `teardownSamples()` function handles this.
+- **Category indices in perf.json.** The `category_indices` field maps category names to track indices, enabling `trigger_hook`/`trigger_accent`/`swap_variant` to work without hardcoded indices.
 
 ## Architecture
 
