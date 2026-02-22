@@ -140,6 +140,9 @@ let perfBpm = 120;
 let perfSwing = 0.2;
 let perfSwingSub = "16n";
 
+// Map from track index → Tone.Player for sample tracks
+const samplePlayers = {};
+
 async function loadPerformance() {
   const res = await fetch("/perf");
   perfConfig = await res.json();
@@ -154,7 +157,50 @@ async function loadPerformance() {
   perfSwing = perfConfig.swing || 0;
   perfSwingSub = perfConfig.swing_subdivision || "16n";
 
-  log(`loaded: ${perfConfig.name} (v${perfConfig.version})`, "action");
+  // Load sample tracks from config
+  const sampleTracks = perfConfig.sample_tracks || [];
+  for (const st of sampleTracks) {
+    const trackIdx = trackDefs.length;
+
+    // Create channel and wire into mixer (same pattern as synth tracks)
+    const ch = new Tone.Channel({ volume: st.volume || -6 }).connect(masterFilter);
+    channels.push(ch);
+
+    const revDb = (st.sends && st.sends.reverb) || -Infinity;
+    const delDb = (st.sends && st.sends.delay) || -Infinity;
+    const rs = new Tone.Gain(Tone.dbToGain(revDb)).connect(reverbSend);
+    const ds = new Tone.Gain(Tone.dbToGain(delDb)).connect(delaySend);
+    ch.connect(rs);
+    ch.connect(ds);
+    revSends.push(rs);
+    delSends.push(ds);
+    sendLevels.push({ rev: revDb, del: delDb });
+
+    // Create player
+    const player = new Tone.Player({
+      url: `/samples/${st.file}`,
+      fadeOut: 0.01  // prevent click on stop
+    }).connect(ch);
+
+    samplePlayers[trackIdx] = player;
+    trackDefs.push({ name: st.name, color: st.color || "#aaa" });
+
+    // Create loop for loop-mode tracks
+    if (st.mode === "loop" && st.interval) {
+      const playerRef = player;
+      const sampleLoop = new Tone.Loop((time) => {
+        playerRef.start(time);
+      }, st.interval);
+      loops.push(sampleLoop);
+    }
+
+    log(`sample track ${trackIdx}: ${st.name} (${st.mode})`, "action");
+  }
+
+  // Wait for all samples to load
+  await Tone.loaded();
+
+  log(`loaded: ${perfConfig.name} (v${perfConfig.version}) — ${sampleTracks.length} sample track(s)`, "action");
   initState();
   buildGestureButtons();
   updateUI();
@@ -394,7 +440,18 @@ const loops = [kickLoop, hatLoop, bassLoop, chordProgressionLoop, padLoop, percP
 function applyScene(idx) {
   currentScene = ((idx % scenes.length) + scenes.length) % scenes.length;
   const scene = scenes[currentScene];
+  // Apply synth track mutes from scene definition
   scene.mutes.forEach((muted, i) => { channels[i].mute = muted; });
+  // Apply sample track mutes from muted_in_scenes config
+  const sampleTracks = (perfConfig && perfConfig.sample_tracks) || [];
+  const synthCount = scene.mutes.length;
+  sampleTracks.forEach((st, i) => {
+    const trackIdx = synthCount + i;
+    if (trackIdx < channels.length) {
+      const muted = (st.muted_in_scenes || []).includes(currentScene);
+      channels[trackIdx].mute = muted;
+    }
+  });
   log(`scene ${currentScene}: ${scene.name} — ${scene.desc}`, "action");
   updateUI();
 }
@@ -594,6 +651,17 @@ function tempoShift(targetBpm, durationMs) {
     Tone.Transport.bpm.rampTo(perfBpm, dur);
     log(`tempo restored → ${perfBpm} BPM`, "action");
   }, dur * 2000);
+}
+
+function triggerSample(trackIdx) {
+  const player = samplePlayers[trackIdx];
+  if (!player) {
+    log(`no sample at track ${trackIdx}`, "action");
+    return;
+  }
+  if (channels[trackIdx] && channels[trackIdx].mute) return;
+  player.start();
+  log(`triggered sample ${trackDefs[trackIdx].name}`, "action");
 }
 
 
@@ -817,6 +885,7 @@ function executeAction(actionName, args) {
     case "reverb_throw":       reverbThrow(args.track, args.duration); break;
     case "bass_drop":          bassDrop(); break;
     case "tempo_shift":        tempoShift(args.bpm, args.duration); break;
+    case "trigger_sample":     triggerSample(args.track); break;
     default:
       log(`unknown action: ${actionName}`, "action");
   }

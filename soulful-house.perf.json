@@ -104,7 +104,8 @@
       { "action": "emphasis_track", "args": { "track": 2, "boost": 0.2, "duration": 2000 },    "weight": 2 },
       { "action": "unmute_track",   "args": { "track": 4 },                                    "weight": 1 },
       { "action": "timed_unmute",   "args": { "track": 5, "duration": 8000 },                  "weight": 1 },
-      { "action": "filter_sweep",   "args": { "freq": 20000, "duration": 2000 },               "weight": 1 }
+      { "action": "filter_sweep",   "args": { "freq": 20000, "duration": 2000 },               "weight": 1 },
+      { "action": "trigger_sample", "args": { "track": 7 },                                    "weight": 2 }
     ],
 
     "shift_structure": [
@@ -178,5 +179,26 @@
     { "name": "Peak",      "mutes": [false, false, false, false, false, false],  "desc": "everything — full soulful house" },
     { "name": "Breakdown", "mutes": [true,  true,  false, false, false, true ],  "desc": "strip to bass + chords + pad" },
     { "name": "Drop",      "mutes": [false, false, false, false, false, false],  "desc": "everything back — big moment" }
+  ],
+
+  "sample_tracks": [
+    {
+      "name": "Break",
+      "file": "test-loop-120bpm.wav",
+      "color": "#f90",
+      "volume": -10,
+      "sends": { "reverb": -18, "delay": -14 },
+      "mode": "loop",
+      "interval": "2m",
+      "muted_in_scenes": [0, 4]
+    },
+    {
+      "name": "Hit",
+      "file": "test-hit.wav",
+      "color": "#f44",
+      "volume": -8,
+      "sends": { "reverb": -10, "delay": -16 },
+      "mode": "oneshot"
+    }
   ]
 }

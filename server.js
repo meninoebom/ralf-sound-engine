@@ -43,6 +43,15 @@ function parseOsc(buf) {
 
 const htmlPath = path.join(__dirname, "index.html");
 const perfPath = path.join(__dirname, "soulful-house.perf.json");
+const samplesDir = path.join(__dirname, "samples");
+
+const MIME_TYPES = {
+  ".wav": "audio/wav",
+  ".mp3": "audio/mpeg",
+  ".ogg": "audio/ogg",
+  ".aac": "audio/aac",
+  ".flac": "audio/flac"
+};
 
 const server = http.createServer((req, res) => {
   if (req.url === "/" || req.url === "/index.html") {
@@ -51,6 +60,18 @@ const server = http.createServer((req, res) => {
   } else if (req.url === "/perf") {
     res.writeHead(200, { "Content-Type": "application/json" });
     fs.createReadStream(perfPath).pipe(res);
+  } else if (req.url.startsWith("/samples/")) {
+    const filename = path.basename(req.url);
+    const filepath = path.join(samplesDir, filename);
+    const ext = path.extname(filename).toLowerCase();
+    const mime = MIME_TYPES[ext];
+    if (!mime || !fs.existsSync(filepath)) {
+      res.writeHead(404);
+      res.end("Not found");
+      return;
+    }
+    res.writeHead(200, { "Content-Type": mime });
+    fs.createReadStream(filepath).pipe(res);
   } else {
     res.writeHead(404);
     res.end("Not found");

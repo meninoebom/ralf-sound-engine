@@ -15,15 +15,15 @@ A programmable music environment where you describe *what you want to happen* an
 - [x] OSC input via WebSocket bridge
 - [x] Manual gesture trigger buttons in UI
 - [x] Scene system with mute states
-- [ ] Extract performance config to `.perf.json` (portable data)
-- [ ] Load performance config at runtime (engine reads JSON, not hardcoded)
+- [x] Extract performance config to `.perf.json` (portable data)
+- [x] Load performance config at runtime (engine reads JSON, not hardcoded)
 - [ ] Define `.perf.json` schema/format spec
 
 ## Phase 2: Sound Primitives
 
 **Goal: Make it easy to create new pieces without rewriting synthesis code**
 
-- [ ] **Sample Player** — Load wav/mp3 files, trigger with pitch/speed control. Unlocks drum breaks, vocal chops, found sounds.
+- [x] **Sample Player** — Load wav/mp3 files, trigger or loop. Two modes: `loop` (transport-synced) and `oneshot` (action-triggered). Declared in perf.json, loaded dynamically.
 - [ ] **Pattern primitive** — Sequences as data (note, velocity, duration, timing). Editable, swappable, generatable.
 - [ ] **Track abstraction** — Source → effects → mixer as a composable unit. Named tracks referenced by performance config.
 - [ ] **Effect chain** — Composable, reorderable effects per track (filter, reverb, delay, chorus, distortion, compressor).

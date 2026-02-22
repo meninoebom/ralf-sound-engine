@@ -73,22 +73,58 @@ Actions are the contract between performance config and runtime. Current vocabul
 | `reverb_throw` | `track`, `duration` | Momentarily drench track in reverb |
 | `bass_drop` | — | Silence → kick+bass slam back |
 | `tempo_shift` | `bpm`, `duration` | Temporary BPM change |
+| `trigger_sample` | `track` | Play a one-shot sample track |
 
 New runtimes (Max4Live, etc.) implement this same vocabulary using their native tools.
+
+## Sample Tracks
+
+Sample tracks are declared in the performance config and created dynamically at load time. Audio files live in `samples/`.
+
+**Config format** (in `.perf.json` → `sample_tracks` array):
+
+```json
+{
+  "name": "Break",
+  "file": "my-loop-120bpm.wav",
+  "color": "#f90",
+  "volume": -10,
+  "sends": { "reverb": -18, "delay": -14 },
+  "mode": "loop",
+  "interval": "2m",
+  "muted_in_scenes": [0, 4]
+}
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `name` | yes | Display name in UI |
+| `file` | yes | Filename in `samples/` directory |
+| `color` | no | UI color (default: #aaa) |
+| `volume` | no | Channel volume in dB (default: -6) |
+| `sends` | no | `{ "reverb": dB, "delay": dB }` send levels |
+| `mode` | yes | `"loop"` (transport-synced repeat) or `"oneshot"` (action-triggered) |
+| `interval` | loop only | Tone.js time value for loop interval (e.g., `"2m"`, `"1m"`, `"4n"`) |
+| `muted_in_scenes` | no | Array of scene indices where this track is muted |
+
+**Track indexing:** Synth tracks occupy indices 0–5, sample tracks start at 6+. All existing actions (mute, unmute, emphasis, reverb throw, etc.) work on sample tracks by index.
+
+**Test samples:** Generate with `node tools/generate-test-samples.js`. Creates synthetic WAV files in `samples/`.
 
 ## Architecture
 
 ```
-server.js                — Node.js: HTTP server + OSC→WebSocket bridge
+server.js                — Node.js: HTTP server + OSC→WebSocket bridge + sample serving
 index.html               — Browser: Tone.js audio engine + UI
+soulful-house.perf.json  — Performance config (portable, runtime-agnostic)
+samples/                 — Audio sample files (wav, mp3, ogg, aac, flac)
+tools/                   — Development utilities (sample generation, etc.)
 docs/roadmap.md          — Project roadmap and future directions
 ```
 
-Currently a single-file browser app with the performance config embedded. Next step: extract config to `.perf.json` and load it at runtime.
-
 ## Current Demo: Soulful House (120 BPM, C minor)
 
-Six tracks: Kick, Hats, Sub Bass, Chords (Rhodes-ish), Pad, Perc (congas/claps). Three gesture mappings: pull-back (energy down), push (energy up), structure shift. Six scenes from Intro through Peak to Drop. Swing at 0.2 on 16ths.
+Six synth tracks: Kick, Hats, Sub Bass, Chords (Rhodes-ish), Pad, Perc (congas/claps). Two sample tracks: Break (loop), Hit (one-shot). Three gesture mappings: pull-back (energy down), push (energy up), structure shift. Six scenes from Intro through Peak to Drop. Swing at 0.2 on 16ths.
 
 ## Quick Start
 
