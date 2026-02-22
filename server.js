@@ -42,7 +42,7 @@ function parseOsc(buf) {
 // =============================================================================
 
 const htmlPath = path.join(__dirname, "index.html");
-const perfPath = path.join(__dirname, "soulful-house.perf.json");
+const defaultPerfPath = path.join(__dirname, "soulful-house.perf.json");
 const samplesDir = path.join(__dirname, "samples");
 
 const MIME_TYPES = {
@@ -57,10 +57,22 @@ const server = http.createServer((req, res) => {
   if (req.url === "/" || req.url === "/index.html") {
     res.writeHead(200, { "Content-Type": "text/html" });
     fs.createReadStream(htmlPath).pipe(res);
-  } else if (req.url === "/perf") {
+  } else if (req.url.startsWith("/perf")) {
+    // Support ?file=my-song.perf.json to load different configs
+    const url = new URL(req.url, `http://localhost:${HTTP_PORT}`);
+    const file = url.searchParams.get("file");
+    const perfPath = file
+      ? path.join(__dirname, path.basename(file))
+      : defaultPerfPath;
+    if (!fs.existsSync(perfPath)) {
+      res.writeHead(404);
+      res.end("Performance config not found");
+      return;
+    }
     res.writeHead(200, { "Content-Type": "application/json" });
     fs.createReadStream(perfPath).pipe(res);
   } else if (req.url.startsWith("/samples/")) {
+    // Serve from samples/ directory (flat — path traversal safe via basename)
     const filename = path.basename(req.url);
     const filepath = path.join(samplesDir, filename);
     const ext = path.extname(filename).toLowerCase();

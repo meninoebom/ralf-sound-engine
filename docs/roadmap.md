@@ -39,12 +39,12 @@ Song.mp3
 
 **What makes this unique:** The gesture mapping layer. Lots of tools can split and slice audio. Nobody else connects the output to a dancer's body through a reactive four-system engine. The interesting part is the mapping between human movement and musical recombination.
 
-**MVP Blender** (~200 lines of Python):
-- `python blender.py "track.mp3"` → stems → slices → samples/ + starter perf.json
-- Dependencies: demucs, librosa, soundfile/pydub
-- Smart categorization: frequency content + duration heuristics to label kick/snare/vocal/texture
+**MVP Blender** (implemented as `blender/` Python package):
+- `python -m blender "track.mp3"` → stems → slices → samples/ + starter perf.json
+- Dependencies: demucs, librosa, soundfile, numpy
+- Smart categorization: spectral centroid + duration heuristics to label kick/snare/hat/perc/phrase/texture
 - Tempo detection for loop sync (librosa.beat.beat_track)
-- Starter perf.json with drum hits as oneshot, phrases as loops, default gesture wiring
+- Starter perf.json with drum hits as oneshot, phrases as loops, default gesture wiring, scenes, full intent pools
 
 ---
 

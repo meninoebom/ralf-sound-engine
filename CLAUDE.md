@@ -111,6 +111,40 @@ Sample tracks are declared in the performance config and created dynamically at 
 
 **Test samples:** Generate with `node tools/generate-test-samples.js`. Creates synthetic WAV files in `samples/`.
 
+## The Blender
+
+Python CLI tool that turns any song into a performable remix:
+
+```bash
+# Zero-config usage
+python -m blender ~/Music/my-song.mp3
+
+# Power user
+python -m blender song.mp3 --bpm 120 --stems drums,bass,vocals --verbose
+```
+
+**Pipeline:** Song → Demucs (stem separation) → Librosa (onset detection) → Slicer → Categorizer → .perf.json
+
+**Output:** Flat-named samples in `samples/` (`drums-kick-01.wav`, `bass-phrase-01.wav`, etc.) plus a complete, immediately playable `.perf.json` with gesture wiring, scenes, and intent pools.
+
+**Dependencies:** `pip install -r blender/requirements.txt` (demucs, librosa, soundfile, numpy)
+
+```
+blender/
+├── __init__.py          # Package
+├── __main__.py          # CLI entry: python -m blender song.mp3
+├── pipeline.py          # Orchestrates all stages
+├── separator.py         # Demucs stem separation
+├── detector.py          # Onset detection + BPM (Librosa)
+├── slicer.py            # Chop stems at onset points
+├── categorizer.py       # Drum classification (spectral heuristics)
+├── config_generator.py  # Generate .perf.json
+├── defaults.py          # Centralized thresholds and defaults
+└── requirements.txt     # Python dependencies
+```
+
+**Loading a blended song:** `http://localhost:8080` loads the default perf.json. To load a different one, the server supports `?file=` query param on the `/perf` endpoint.
+
 ## Architecture
 
 ```
@@ -118,6 +152,7 @@ server.js                — Node.js: HTTP server + OSC→WebSocket bridge + sam
 index.html               — Browser: Tone.js audio engine + UI
 soulful-house.perf.json  — Performance config (portable, runtime-agnostic)
 samples/                 — Audio sample files (wav, mp3, ogg, aac, flac)
+blender/                 — Python CLI: song → stems → samples → .perf.json
 tools/                   — Development utilities (sample generation, etc.)
 docs/roadmap.md          — Project roadmap and future directions
 ```
