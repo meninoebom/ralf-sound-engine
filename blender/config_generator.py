@@ -1,25 +1,22 @@
-"""Generate .perf.json from sample inventory."""
+"""Generate .perf.json from musical primitives."""
 
 import json
 from pathlib import Path
 
-from .defaults import (
-    DRUM_VOLUME_DB, LOOP_VOLUME_DB, DEFAULT_VOLUME_DB,
-    DEFAULT_REVERB_SEND_DB, DEFAULT_DELAY_SEND_DB,
-    STEM_COLORS, SCENE_TEMPLATES,
-)
 from .slicer import Slice
+from .defaults import (
+    CATEGORY_MODES, CATEGORY_COLORS, CATEGORY_VOLUMES,
+    DEFAULT_REVERB_SEND_DB, DEFAULT_DELAY_SEND_DB,
+    DENSITY_SCENES, STARTING_SCENE,
+)
 
 
-def _infer_loop_interval(duration_ms: float, bpm: float) -> str:
-    """Infer Tone.js loop interval from slice duration and BPM.
-
-    Snaps to nearest musical duration (1m, 2m, 4m).
-    """
+def _infer_interval(duration_ms: float, bpm: float, default: str) -> str:
+    """Snap slice duration to nearest musical interval."""
     beat_ms = 60000 / bpm
     bar_ms = beat_ms * 4
-
     bars = duration_ms / bar_ms
+
     if bars <= 1.5:
         return "1m"
     elif bars <= 3:
@@ -30,98 +27,93 @@ def _infer_loop_interval(duration_ms: float, bpm: float) -> str:
         return "8m"
 
 
-def _is_oneshot(stem_name: str, category: str) -> bool:
-    """Determine if a sample should be oneshot (True) or loop (False)."""
-    if stem_name == "drums":
-        return True  # All drum hits are oneshot
-    if category == "texture":
-        return True   # Short textures are oneshot
-    return False  # Phrases are loops
-
-
 def generate_config(
-    sample_inventory: dict[str, list[Slice]],
+    primitives: dict[str, list[Slice]],
     bpm: float,
     song_name: str,
     samples_dir: Path,
 ) -> dict:
-    """Generate a complete .perf.json from categorized samples.
+    """Generate a complete .perf.json from categorized musical primitives.
 
-    sample_inventory: {stem_name: [Slice, ...]} where each Slice.path
-                      has the categorized filename (e.g., drums-kick-01.wav)
+    primitives: {category: [Slice, ...]} from select_primitives()
     """
     sample_tracks = []
-    stem_track_indices: dict[str, list[int]] = {s: [] for s in sample_inventory}
-
-    # Track index starts at 0 (no synth tracks in blender output)
+    category_indices: dict[str, list[int]] = {}
     track_idx = 0
 
-    for stem_name, slices in sample_inventory.items():
-        color = STEM_COLORS.get(stem_name, "#aaa")
+    # Category display order
+    category_order = ["foundation", "groove", "bass", "harmonic_bed", "hook", "texture", "accent"]
 
-        for sl in slices:
-            filename = sl.path.name
-            # Extract category from filename: "drums-kick-01.wav" → "kick"
-            parts = filename.replace(".wav", "").split("-")
-            category = parts[1] if len(parts) >= 3 else "sample"
+    for category in category_order:
+        slices = primitives.get(category, [])
+        if not slices:
+            continue
 
-            oneshot = _is_oneshot(stem_name, category)
-            display_name = f"{stem_name.title()} {category.title()} {parts[-1] if len(parts) >= 3 else ''}"
+        category_indices[category] = []
+        mode_def = CATEGORY_MODES[category]
+        color = CATEGORY_COLORS.get(category, "#aaa")
+        volume = CATEGORY_VOLUMES.get(category, -8)
+
+        for i, sl in enumerate(slices):
+            display_name = f"{category.replace('_', ' ').title()} {i + 1}"
+            mode = mode_def["mode"]
 
             track = {
-                "name": display_name.strip(),
-                "file": filename,
+                "name": display_name,
+                "file": sl.path.name,
                 "color": color,
-                "volume": DRUM_VOLUME_DB if stem_name == "drums" else (
-                    LOOP_VOLUME_DB if not oneshot else DEFAULT_VOLUME_DB
-                ),
+                "category": category,
+                "volume": volume,
                 "sends": {
                     "reverb": DEFAULT_REVERB_SEND_DB,
                     "delay": DEFAULT_DELAY_SEND_DB,
                 },
-                "mode": "oneshot" if oneshot else "loop",
+                "mode": mode,
             }
 
-            if not oneshot:
-                track["interval"] = _infer_loop_interval(sl.duration_ms, bpm)
+            if mode == "loop":
+                default_interval = mode_def["interval"] or "2m"
+                track["interval"] = _infer_interval(sl.duration_ms, bpm, default_interval)
 
-            # Muted-in-scenes: derive from scene templates
-            muted_scenes = []
-            for scene_idx, scene in enumerate(SCENE_TEMPLATES):
-                if scene["mutes"].get(stem_name, False):
-                    muted_scenes.append(scene_idx)
-            if muted_scenes:
-                track["muted_in_scenes"] = muted_scenes
+            # Muted-in-scenes: muted in any scene where this category is NOT active
+            # Hook and accent are always unmuted (gesture-triggered, not scene-controlled)
+            if category not in ("hook", "accent"):
+                muted_scenes = []
+                for scene_idx, scene in enumerate(DENSITY_SCENES):
+                    if category not in scene["active"]:
+                        muted_scenes.append(scene_idx)
+                if muted_scenes:
+                    track["muted_in_scenes"] = muted_scenes
 
             sample_tracks.append(track)
-            stem_track_indices[stem_name].append(track_idx)
+            category_indices[category].append(track_idx)
             track_idx += 1
 
-    # Collect oneshot indices for trigger_sample actions
-    drum_indices = stem_track_indices.get("drums", [])
-    vocal_indices = stem_track_indices.get("vocals", [])
-    bass_indices = stem_track_indices.get("bass", [])
-    other_indices = stem_track_indices.get("other", [])
-    all_indices = list(range(track_idx))
+    # Build scenes (no synth track mutes — pure sample engine)
+    scenes = []
+    for scene in DENSITY_SCENES:
+        scenes.append({
+            "name": scene["name"],
+            "mutes": [],  # no synth tracks
+            "desc": f"Active: {', '.join(scene['active'])}",
+        })
 
-    # Build intent pools referencing actual track indices
-    def _trigger_actions(indices, weight=1):
-        return [{"action": "trigger_sample", "args": {"track": i}, "weight": weight} for i in indices[:4]]
+    # Build intent pools using category indices
+    hook_indices = category_indices.get("hook", [])
+    accent_indices = category_indices.get("accent", [])
+    bass_indices = category_indices.get("bass", [])
 
-    def _mute_actions(indices, weight=1):
-        return [{"action": "mute_track", "args": {"track": i}, "weight": weight} for i in indices[:3]]
-
-    def _unmute_actions(indices, weight=1):
-        return [{"action": "unmute_track", "args": {"track": i}, "weight": weight} for i in indices[:3]]
+    def _trigger_pool(indices, weight=1):
+        return [{"action": "trigger_sample", "args": {"track": i}, "weight": weight} for i in indices]
 
     config = {
-        "version": "0.1",
+        "version": "0.2",
         "name": f"{song_name} (Blended)",
         "bpm": bpm,
         "swing": 0,
         "swing_subdivision": "16n",
 
-        "tracks": [],  # No synth tracks — pure samples
+        "tracks": [],
 
         "gestures": {
             "/gesture/1": {
@@ -185,59 +177,58 @@ def generate_config(
         },
 
         "intents": {
-            "strip_energy": (
-                [{"action": "filter_sweep", "args": {"freq": 300, "duration": 3000}, "weight": 3}]
-                + [{"action": "hush_master", "args": {"drop": 0.4, "duration": 2500}, "weight": 2}]
-                + _mute_actions(drum_indices, 2)
-            ),
-            "add_energy": (
-                _unmute_actions(drum_indices, 2)
-                + _trigger_actions(drum_indices[:2], 2)
-                + [{"action": "filter_sweep", "args": {"freq": 20000, "duration": 2000}, "weight": 1}]
-            ),
+            "strip_energy": [
+                {"action": "scene_down", "weight": 3},
+                {"action": "filter_sweep", "args": {"freq": 300, "duration": 3000}, "weight": 2},
+                {"action": "hush_master", "args": {"drop": 0.4, "duration": 2500}, "weight": 1},
+            ],
+            "add_energy": [
+                {"action": "scene_up", "weight": 3},
+                {"action": "trigger_hook", "weight": 2},
+            ] + _trigger_pool(accent_indices, 2),
             "shift_structure": [
-                {"action": "fire_next_scene", "weight": 3},
+                {"action": "swap_variant", "weight": 3},
                 {"action": "breakdown", "args": {"duration": 6000}, "weight": 2},
+                {"action": "trigger_hook", "weight": 1},
             ],
             "frantic_strip": [
+                {"action": "scene_down", "weight": 2},
                 {"action": "breakdown", "args": {"duration": 8000}, "weight": 2},
-                {"action": "filter_sweep", "args": {"freq": 150, "duration": 5000}, "weight": 2},
                 {"action": "hush_master", "args": {"drop": 0.6, "duration": 4000}, "weight": 1},
             ],
             "explosive_build": [
-                {"action": "bass_drop", "weight": 2},
-                {"action": "fire_scene", "args": {"scene": 3}, "weight": 2},
+                {"action": "scene_up", "weight": 2},
+                {"action": "trigger_hook", "weight": 2},
+                {"action": "bass_drop", "weight": 1},
             ],
             "total_reset": [
-                {"action": "bass_drop", "weight": 2},
-                {"action": "fire_scene", "args": {"scene": 4}, "weight": 1},
-                {"action": "fire_scene", "args": {"scene": 5}, "weight": 1},
+                {"action": "fire_scene", "args": {"scene": 0}, "weight": 2},
+                {"action": "bass_drop", "weight": 1},
             ],
             "peak_frenzy": [
-                {"action": "fire_scene", "args": {"scene": 3}, "weight": 2},
-                {"action": "bass_drop", "weight": 1},
+                {"action": "fire_scene", "args": {"scene": 4}, "weight": 2},
+            ] + _trigger_pool(hook_indices, 1) + _trigger_pool(accent_indices, 1),
+            "minor_shift": [
+                {"action": "trigger_accent", "weight": 2},
+                {"action": "swap_variant", "weight": 1},
             ],
-            "minor_shift": (
-                _trigger_actions(vocal_indices[:2], 2)
-                + [{"action": "filter_sweep", "args": {"freq": 600, "duration": 3000}, "weight": 1}]
-            ),
             "breakthrough": [
-                {"action": "fire_next_scene", "weight": 3},
-                {"action": "bass_drop", "weight": 2},
-                {"action": "breakdown", "args": {"duration": 8000}, "weight": 1},
+                {"action": "scene_up", "weight": 3},
+                {"action": "trigger_hook", "weight": 2},
+                {"action": "bass_drop", "weight": 1},
             ],
             "full_breakdown": [
-                {"action": "breakdown", "args": {"duration": 10000}, "weight": 3},
-                {"action": "filter_sweep", "args": {"freq": 200, "duration": 6000}, "weight": 1},
+                {"action": "fire_scene", "args": {"scene": 0}, "weight": 2},
+                {"action": "breakdown", "args": {"duration": 10000}, "weight": 2},
             ],
             "scene_advance": [
-                {"action": "fire_next_scene", "weight": 3},
-                {"action": "bass_drop", "weight": 1},
+                {"action": "scene_up", "weight": 3},
+                {"action": "trigger_accent", "weight": 1},
             ],
             "structure_payoff": [
-                {"action": "fire_next_scene", "weight": 2},
-                {"action": "breakdown", "args": {"duration": 6000}, "weight": 2},
-                {"action": "bass_drop", "weight": 1},
+                {"action": "swap_variant", "weight": 2},
+                {"action": "scene_up", "weight": 2},
+                {"action": "trigger_hook", "weight": 1},
             ],
         },
 
@@ -252,12 +243,12 @@ def generate_config(
             },
         },
 
-        "scenes": [
-            {"name": s["name"], "mutes": [], "desc": s["name"]}
-            for s in SCENE_TEMPLATES
-        ],
-
+        "scenes": scenes,
         "sample_tracks": sample_tracks,
+        "starting_scene": STARTING_SCENE,
+
+        # Category index map for engine actions (trigger_hook, trigger_accent, swap_variant)
+        "category_indices": {k: v for k, v in category_indices.items() if v},
     }
 
     # Filter out empty intent pools

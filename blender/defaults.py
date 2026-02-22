@@ -4,41 +4,72 @@
 DEMUCS_MODEL = "htdemucs"
 STEM_NAMES = ["drums", "bass", "vocals", "other"]
 
-# Onset detection
-MIN_SLICE_DURATION_MS = 500  # Discard slices shorter than this (was 100, too many micro-slices)
-FADE_OUT_MS = 10             # Fade-out to prevent clicks at slice boundaries
-MAX_SLICES_PER_STEM = 30     # Safety cap — keep the best N slices per stem
+# Onset detection (used for accent slicing fallback)
+MIN_SLICE_DURATION_MS = 500
+FADE_OUT_MS = 10
+MAX_SLICES_PER_STEM = 30
 
-# Drum categorization thresholds (spectral centroid in Hz)
-KICK_CENTROID_MAX = 500
-KICK_MIN_DURATION = 0.1      # seconds
-HAT_CENTROID_MIN = 5000
-HAT_MAX_DURATION = 0.1
-SNARE_CENTROID_MIN = 1000
-SNARE_MAX_DURATION = 0.3
+# Category limits: 12-18 total samples per song
+CATEGORY_LIMITS = {
+    "foundation": 2,
+    "groove": 2,
+    "bass": 3,
+    "harmonic_bed": 2,
+    "hook": 2,
+    "texture": 2,
+    "accent": 5,
+}
 
-# Non-drum categorization
-PHRASE_MIN_DURATION = 0.5     # seconds — shorter = "texture", longer = "phrase"
+# Category → mode and default interval
+CATEGORY_MODES = {
+    "foundation":   {"mode": "loop",    "interval": "1m"},
+    "groove":       {"mode": "loop",    "interval": "1m"},
+    "bass":         {"mode": "loop",    "interval": "2m"},
+    "harmonic_bed": {"mode": "loop",    "interval": "4m"},
+    "hook":         {"mode": "oneshot", "interval": None},
+    "texture":      {"mode": "loop",    "interval": "4m"},
+    "accent":       {"mode": "oneshot", "interval": None},
+}
 
-# Config generation
-DEFAULT_VOLUME_DB = -8
-DRUM_VOLUME_DB = -6
-LOOP_VOLUME_DB = -10
+# Category colors for UI
+CATEGORY_COLORS = {
+    "foundation":   "#f90",
+    "groove":       "#fa0",
+    "bass":         "#4af",
+    "harmonic_bed": "#af4",
+    "hook":         "#f4a",
+    "texture":      "#8af",
+    "accent":       "#f84",
+}
+
+# Volume defaults per category (dB)
+CATEGORY_VOLUMES = {
+    "foundation":   -6,
+    "groove":       -8,
+    "bass":         -6,
+    "harmonic_bed": -10,
+    "hook":         -6,
+    "texture":      -14,
+    "accent":       -6,
+}
+
 DEFAULT_REVERB_SEND_DB = -14
 DEFAULT_DELAY_SEND_DB = -18
 
-# Scene templates (mute patterns for 4 stem groups: drums, bass, vocals, other)
-# True = muted
-SCENE_TEMPLATES = [
-    {"name": "Intro",     "mutes": {"drums": True,  "bass": False, "vocals": False, "other": True}},
-    {"name": "Groove",    "mutes": {"drums": False, "bass": False, "vocals": True,  "other": True}},
-    {"name": "Build",     "mutes": {"drums": False, "bass": False, "vocals": False, "other": True}},
-    {"name": "Peak",      "mutes": {"drums": False, "bass": False, "vocals": False, "other": False}},
-    {"name": "Breakdown", "mutes": {"drums": True,  "bass": False, "vocals": False, "other": False}},
-    {"name": "Drop",      "mutes": {"drums": False, "bass": False, "vocals": False, "other": False}},
+# 5 density-layer scenes (start sparse, build UP)
+# Each scene lists which categories are ACTIVE (unmuted)
+DENSITY_SCENES = [
+    {"name": "Bare",     "active": ["texture"]},
+    {"name": "Skeletal", "active": ["texture", "harmonic_bed"]},
+    {"name": "Groove",   "active": ["foundation", "groove", "bass"]},
+    {"name": "Full",     "active": ["foundation", "groove", "bass", "harmonic_bed"]},
+    {"name": "Peak",     "active": ["foundation", "groove", "bass", "harmonic_bed", "texture"]},
 ]
+# NOTE: hook and accent are NEVER scene-controlled — always gesture-triggered
 
-# Stem colors for UI
+STARTING_SCENE = 1  # Skeletal
+
+# Stem colors for UI (legacy, kept for compatibility)
 STEM_COLORS = {
     "drums": "#f90",
     "bass": "#4af",

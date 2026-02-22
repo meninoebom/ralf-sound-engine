@@ -45,6 +45,32 @@ def detect_onsets(audio_path: Path, is_drums: bool = False) -> list[float]:
     return onset_times.tolist()
 
 
+def detect_bar_boundaries(audio_path: Path, bpm: float) -> list[float]:
+    """Detect bar boundaries (every 4 beats) aligned to the beat grid.
+
+    Uses librosa beat tracking to find actual beat positions, then groups them
+    into bars. This produces musically useful loop boundaries.
+
+    Returns list of times in seconds at the start of each bar.
+    """
+    y, sr = librosa.load(str(audio_path), sr=None)
+    duration = len(y) / sr
+
+    # Get beat positions from librosa
+    _, beat_frames = librosa.beat.beat_track(y=y, sr=sr, bpm=bpm)
+    beat_times = librosa.frames_to_time(beat_frames, sr=sr)
+
+    if len(beat_times) < 4:
+        # Not enough beats detected — fall back to BPM-based grid
+        bar_duration = 4 * 60.0 / bpm
+        return [i * bar_duration for i in range(int(duration / bar_duration) + 1)]
+
+    # Group beats into bars (every 4 beats)
+    bar_boundaries = [beat_times[i] for i in range(0, len(beat_times), 4)]
+
+    return bar_boundaries
+
+
 def get_duration(audio_path: Path) -> float:
     """Get duration of an audio file in seconds."""
     return float(librosa.get_duration(path=str(audio_path)))

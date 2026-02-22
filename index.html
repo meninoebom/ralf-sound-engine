@@ -149,7 +149,46 @@ let perfSwing = 0.2;
 let perfSwingSub = "16n";
 
 // Map from track index → Tone.Player for sample tracks
-const samplePlayers = {};
+let samplePlayers = {};
+// Track how many synth tracks exist (fixed at init, samples come after)
+const SYNTH_TRACK_COUNT = 6;
+// Track sample loops separately so we can teardown without killing synth loops
+let sampleLoops = [];
+// Category metadata for UI grouping
+let sampleCategories = {};
+
+function teardownSamples() {
+  // Stop and dispose sample-specific audio nodes
+  sampleLoops.forEach(l => { try { l.stop(); l.dispose(); } catch(e) {} });
+  sampleLoops = [];
+
+  // Dispose sample players
+  for (const idx in samplePlayers) {
+    try { samplePlayers[idx].stop(); samplePlayers[idx].dispose(); } catch(e) {}
+  }
+  samplePlayers = {};
+
+  // Dispose sample channels and sends (everything after synth tracks)
+  for (let i = channels.length - 1; i >= SYNTH_TRACK_COUNT; i--) {
+    try { channels[i].dispose(); } catch(e) {}
+    try { revSends[i].dispose(); } catch(e) {}
+    try { delSends[i].dispose(); } catch(e) {}
+  }
+  channels.length = SYNTH_TRACK_COUNT;
+  revSends.length = SYNTH_TRACK_COUNT;
+  delSends.length = SYNTH_TRACK_COUNT;
+  sendLevels.length = SYNTH_TRACK_COUNT;
+  trackDefs.length = SYNTH_TRACK_COUNT;
+
+  // Remove sample loops from the main loops array (keep synth loops 0-5)
+  loops.length = SYNTH_TRACK_COUNT;
+
+  sampleCategories = {};
+
+  // Clear UI
+  document.getElementById("tracks").innerHTML = "";
+  document.getElementById("gesture-buttons").innerHTML = "";
+}
 
 async function loadPerformance(perfFile) {
   const url = perfFile ? `/perf?file=${encodeURIComponent(perfFile)}` : "/perf";
@@ -192,7 +231,12 @@ async function loadPerformance(perfFile) {
     }).connect(ch);
 
     samplePlayers[trackIdx] = player;
-    trackDefs.push({ name: st.name, color: st.color || "#aaa" });
+    const category = st.category || "sample";
+    trackDefs.push({ name: st.name, color: st.color || "#aaa", category });
+
+    // Track categories for UI grouping and action targeting
+    if (!sampleCategories[category]) sampleCategories[category] = [];
+    sampleCategories[category].push(trackIdx);
 
     // Create loop for loop-mode tracks
     if (st.mode === "loop" && st.interval) {
@@ -201,6 +245,7 @@ async function loadPerformance(perfFile) {
         playerRef.start(time);
       }, st.interval);
       loops.push(sampleLoop);
+      sampleLoops.push(sampleLoop);
     }
 
     log(`sample track ${trackIdx}: ${st.name} (${st.mode})`, "action");
@@ -208,6 +253,9 @@ async function loadPerformance(perfFile) {
 
   // Wait for all samples to load
   await Tone.loaded();
+
+  // Apply starting scene
+  currentScene = perfConfig.starting_scene || 0;
 
   log(`loaded: ${perfConfig.name} (v${perfConfig.version}) — ${sampleTracks.length} sample track(s)`, "action");
   initState();
@@ -673,6 +721,65 @@ function triggerSample(trackIdx) {
   log(`triggered sample ${trackDefs[trackIdx].name}`, "action");
 }
 
+// --- Scene density navigation ---
+
+function sceneUp() {
+  if (currentScene < scenes.length - 1) {
+    applyScene(currentScene + 1);
+    log(`scene UP → ${scenes[currentScene].name}`, "action");
+  }
+}
+
+function sceneDown() {
+  if (currentScene > 0) {
+    applyScene(currentScene - 1);
+    log(`scene DOWN → ${scenes[currentScene].name}`, "action");
+  }
+}
+
+// --- Category-based triggers ---
+
+function triggerHook() {
+  const indices = (perfConfig && perfConfig.category_indices && perfConfig.category_indices.hook) || [];
+  if (indices.length === 0) return;
+  const idx = indices[Math.floor(Math.random() * indices.length)];
+  triggerSample(idx);
+  log("trigger hook", "action");
+}
+
+function triggerAccent() {
+  const indices = (perfConfig && perfConfig.category_indices && perfConfig.category_indices.accent) || [];
+  if (indices.length === 0) return;
+  const idx = indices[Math.floor(Math.random() * indices.length)];
+  triggerSample(idx);
+  log("trigger accent", "action");
+}
+
+// --- Variant swapping ---
+
+let variantState = {};  // category → current index
+
+function swapVariant() {
+  // Cycle through bass or harmonic_bed variants
+  const categories = ["bass", "harmonic_bed"];
+  for (const cat of categories) {
+    const indices = (perfConfig && perfConfig.category_indices && perfConfig.category_indices[cat]) || [];
+    if (indices.length <= 1) continue;
+
+    if (!variantState[cat]) variantState[cat] = 0;
+    // Mute current, unmute next
+    const current = indices[variantState[cat]];
+    variantState[cat] = (variantState[cat] + 1) % indices.length;
+    const next = indices[variantState[cat]];
+
+    channels[current].mute = true;
+    channels[next].mute = false;
+    log(`swap ${cat}: variant ${variantState[cat] + 1}/${indices.length}`, "action");
+    updateUI();
+    return;  // Only swap one category per call
+  }
+}
+
 
 // =============================================================================
 // FOUR-SYSTEM ENGINE (ported from gesture-controller.js)
@@ -694,6 +801,7 @@ const GESTURE_COUNT = 10;
 
 function buildGestureButtons() {
   const container = document.getElementById("gesture-buttons");
+  container.innerHTML = "";
   for (let i = 1; i <= GESTURE_COUNT; i++) {
     const addr = `/gesture/${i}`;
     const profile = gestures[addr];
@@ -895,6 +1003,11 @@ function executeAction(actionName, args) {
     case "bass_drop":          bassDrop(); break;
     case "tempo_shift":        tempoShift(args.bpm, args.duration); break;
     case "trigger_sample":     triggerSample(args.track); break;
+    case "scene_up":           sceneUp(); break;
+    case "scene_down":         sceneDown(); break;
+    case "trigger_hook":       triggerHook(); break;
+    case "trigger_accent":     triggerAccent(); break;
+    case "swap_variant":       swapVariant(); break;
     default:
       log(`unknown action: ${actionName}`, "action");
   }
@@ -942,21 +1055,48 @@ function log(msg, cls) {
   el.scrollTop = el.scrollHeight;
 }
 
+function _buildTrackCard(def, i) {
+  const div = document.createElement("div");
+  div.className = "track";
+  div.id = `track-${i}`;
+  div.innerHTML = `
+    <div class="name" style="color:${def.color}">${def.name}</div>
+    <div class="meter"><div class="meter-fill" id="meter-${i}"></div></div>
+    <div class="vol" id="vol-${i}">0%</div>
+  `;
+  return div;
+}
+
 function updateUI() {
-  // Track cards
+  // Track cards — rebuild if count changed
   const container = document.getElementById("tracks");
-  if (container.children.length === 0) {
-    trackDefs.forEach((def, i) => {
-      const div = document.createElement("div");
-      div.className = "track";
-      div.id = `track-${i}`;
-      div.innerHTML = `
-        <div class="name" style="color:${def.color}">${def.name}</div>
-        <div class="meter"><div class="meter-fill" id="meter-${i}"></div></div>
-        <div class="vol" id="vol-${i}">0%</div>
-      `;
-      container.appendChild(div);
-    });
+  if (container.children.length !== trackDefs.length) {
+    container.innerHTML = "";
+    // Group by category if categories exist
+    const hasCats = Object.keys(sampleCategories).length > 0;
+    if (hasCats) {
+      // Show synth tracks first (if any)
+      for (let i = 0; i < SYNTH_TRACK_COUNT && i < trackDefs.length; i++) {
+        container.appendChild(_buildTrackCard(trackDefs[i], i));
+      }
+      // Show sample tracks grouped by category
+      const catOrder = ["foundation", "groove", "bass", "harmonic_bed", "hook", "texture", "accent"];
+      for (const cat of catOrder) {
+        const indices = sampleCategories[cat];
+        if (!indices || indices.length === 0) continue;
+        const header = document.createElement("div");
+        header.style.cssText = "grid-column:1/-1; font-size:11px; color:#888; text-transform:uppercase; letter-spacing:1px; margin-top:8px; border-bottom:1px solid #333; padding-bottom:4px;";
+        header.textContent = `${cat.replace("_", " ")} (${indices.length})`;
+        container.appendChild(header);
+        for (const idx of indices) {
+          container.appendChild(_buildTrackCard(trackDefs[idx], idx));
+        }
+      }
+    } else {
+      trackDefs.forEach((def, i) => {
+        container.appendChild(_buildTrackCard(def, i));
+      });
+    }
   }
 
   trackDefs.forEach((def, i) => {
@@ -1023,6 +1163,8 @@ async function switchPerformance() {
   if (!file) return;
   // Stop if playing
   if (playing) stopPlaying();
+  // Tear down old sample audio nodes before loading new config
+  teardownSamples();
   // Reload with new config
   await loadPerformance(file);
   document.getElementById("perf-name").textContent = perfConfig.name || file;

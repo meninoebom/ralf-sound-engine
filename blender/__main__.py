@@ -15,7 +15,6 @@ def main():
     parser.add_argument("song", type=Path, help="Path to song file (mp3, wav, flac, etc.)")
     parser.add_argument("--bpm", type=float, default=None, help="Override auto-detected BPM")
     parser.add_argument("--output-dir", type=Path, default=None, help="Output directory (default: current dir)")
-    parser.add_argument("--min-duration", type=int, default=100, help="Min slice duration in ms (default: 100)")
     parser.add_argument("--stems", type=str, default=None, help="Comma-separated stems to keep (e.g., drums,bass,vocals)")
     parser.add_argument("--verbose", action="store_true", help="Show detailed analysis output")
 
@@ -37,7 +36,6 @@ def main():
             song_path=song,
             output_dir=args.output_dir,
             bpm_override=args.bpm,
-            min_duration_ms=args.min_duration,
             stems_filter=stems_filter,
             verbose=args.verbose,
         )
