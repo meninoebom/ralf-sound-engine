@@ -1,0 +1,182 @@
+{
+  "version": "0.1",
+  "name": "Soulful House Set",
+  "bpm": 120,
+  "swing": 0.2,
+  "swing_subdivision": "16n",
+
+  "tracks": [
+    { "name": "Kick",     "index": 0 },
+    { "name": "Hats",     "index": 1 },
+    { "name": "Sub Bass", "index": 2 },
+    { "name": "Chords",   "index": 3 },
+    { "name": "Pad",      "index": 4 },
+    { "name": "Perc",     "index": 5 }
+  ],
+
+  "gestures": {
+    "/gesture/1": {
+      "name": "pull back",
+      "streams":  { "energy_down": 1, "all_movement": 1 },
+      "stacks":   { "total_moves": 1, "pull_back_streak": 1 },
+      "intents":  ["strip_energy"],
+      "signals":  ["stop"]
+    },
+    "/gesture/2": {
+      "name": "push energy",
+      "streams":  { "energy_up": 1, "all_movement": 1 },
+      "stacks":   { "total_moves": 1, "push_streak": 1 },
+      "intents":  ["add_energy"],
+      "signals":  ["start"]
+    },
+    "/gesture/3": {
+      "name": "structure shift",
+      "streams":  { "structure_rate": 1, "all_movement": 1 },
+      "stacks":   { "total_moves": 1, "structure_count": 1 },
+      "intents":  ["shift_structure"],
+      "signals":  []
+    }
+  },
+
+  "streams": {
+    "energy_down": {
+      "window_ms": 5000,
+      "thresholds": [
+        { "above": 6, "action": { "intent": "frantic_strip" } }
+      ]
+    },
+    "energy_up": {
+      "window_ms": 5000,
+      "thresholds": [
+        { "above": 6, "action": { "intent": "explosive_build" } }
+      ]
+    },
+    "structure_rate": {
+      "window_ms": 5000,
+      "thresholds": [
+        { "above": 4, "action": { "intent": "total_reset" } }
+      ]
+    },
+    "all_movement": {
+      "window_ms": 5000,
+      "thresholds": [
+        { "above": 10, "action": { "intent": "peak_frenzy" } }
+      ]
+    }
+  },
+
+  "stacks": {
+    "total_moves": {
+      "triggers": [
+        { "at": 5,  "action": { "intent": "minor_shift" },  "reset": false },
+        { "at": 15, "action": { "intent": "breakthrough" },  "reset": true  }
+      ]
+    },
+    "pull_back_streak": {
+      "triggers": [
+        { "at": 5, "action": { "intent": "full_breakdown" }, "reset": true }
+      ]
+    },
+    "push_streak": {
+      "triggers": [
+        { "at": 5, "action": { "intent": "scene_advance" }, "reset": true }
+      ]
+    },
+    "structure_count": {
+      "triggers": [
+        { "at": 3, "action": { "intent": "structure_payoff" }, "reset": true }
+      ]
+    }
+  },
+
+  "intents": {
+    "strip_energy": [
+      { "action": "filter_sweep",   "args": { "freq": 300, "duration": 3000 },                "weight": 3 },
+      { "action": "hush_master",    "args": { "drop": 0.4, "duration": 2500 },                "weight": 2 },
+      { "action": "mute_track",     "args": { "track": 5 },                                    "weight": 2 },
+      { "action": "mute_track",     "args": { "track": 0 },                                    "weight": 1 },
+      { "action": "reverb_throw",   "args": { "track": 3, "duration": 4000 },                  "weight": 2 }
+    ],
+
+    "add_energy": [
+      { "action": "unmute_track",   "args": { "track": 0 },                                    "weight": 2 },
+      { "action": "unmute_track",   "args": { "track": 5 },                                    "weight": 2 },
+      { "action": "emphasis_track", "args": { "track": 2, "boost": 0.2, "duration": 2000 },    "weight": 2 },
+      { "action": "unmute_track",   "args": { "track": 4 },                                    "weight": 1 },
+      { "action": "timed_unmute",   "args": { "track": 5, "duration": 8000 },                  "weight": 1 },
+      { "action": "filter_sweep",   "args": { "freq": 20000, "duration": 2000 },               "weight": 1 }
+    ],
+
+    "shift_structure": [
+      { "action": "fire_next_scene",                                                            "weight": 3 },
+      { "action": "breakdown",      "args": { "duration": 6000 },                              "weight": 2 },
+      { "action": "reverb_throw",   "args": { "track": 4, "duration": 5000 },                  "weight": 1 }
+    ],
+
+    "frantic_strip": [
+      { "action": "breakdown",      "args": { "duration": 8000 },                              "weight": 2 },
+      { "action": "filter_sweep",   "args": { "freq": 150, "duration": 5000 },                 "weight": 2 },
+      { "action": "hush_master",    "args": { "drop": 0.6, "duration": 4000 },                 "weight": 1 }
+    ],
+    "explosive_build": [
+      { "action": "bass_drop",                                                                  "weight": 2 },
+      { "action": "fire_scene",     "args": { "scene": 3 },                                    "weight": 2 },
+      { "action": "tempo_shift",    "args": { "bpm": 128, "duration": 6000 },                  "weight": 1 }
+    ],
+    "total_reset": [
+      { "action": "bass_drop",                                                                  "weight": 2 },
+      { "action": "fire_scene",     "args": { "scene": 4 },                                    "weight": 1 },
+      { "action": "fire_scene",     "args": { "scene": 5 },                                    "weight": 1 }
+    ],
+    "peak_frenzy": [
+      { "action": "tempo_shift",    "args": { "bpm": 130, "duration": 8000 },                  "weight": 2 },
+      { "action": "bass_drop",                                                                  "weight": 1 },
+      { "action": "fire_scene",     "args": { "scene": 3 },                                    "weight": 1 }
+    ],
+
+    "minor_shift": [
+      { "action": "reverb_throw",   "args": { "track": 3, "duration": 3000 },                  "weight": 2 },
+      { "action": "emphasis_track", "args": { "track": 2, "boost": 0.25, "duration": 2000 },   "weight": 2 },
+      { "action": "timed_unmute",   "args": { "track": 4, "duration": 6000 },                  "weight": 1 },
+      { "action": "filter_sweep",   "args": { "freq": 600, "duration": 3000 },                 "weight": 1 }
+    ],
+    "breakthrough": [
+      { "action": "fire_next_scene",                                                            "weight": 3 },
+      { "action": "bass_drop",                                                                  "weight": 2 },
+      { "action": "breakdown",      "args": { "duration": 8000 },                              "weight": 1 }
+    ],
+    "full_breakdown": [
+      { "action": "breakdown",      "args": { "duration": 10000 },                             "weight": 3 },
+      { "action": "filter_sweep",   "args": { "freq": 200, "duration": 6000 },                 "weight": 1 }
+    ],
+    "scene_advance": [
+      { "action": "fire_next_scene",                                                            "weight": 3 },
+      { "action": "bass_drop",                                                                  "weight": 1 }
+    ],
+    "structure_payoff": [
+      { "action": "fire_next_scene",                                                            "weight": 2 },
+      { "action": "breakdown",      "args": { "duration": 6000 },                              "weight": 2 },
+      { "action": "bass_drop",                                                                  "weight": 1 }
+    ]
+  },
+
+  "signals": {
+    "start": {
+      "action": "start_playing",
+      "condition": { "state_equals": "stopped" }
+    },
+    "stop": {
+      "action": "stop_playing",
+      "condition": { "state_equals": "playing", "min_elapsed_ms": 300000 }
+    }
+  },
+
+  "scenes": [
+    { "name": "Intro",     "mutes": [true,  false, false, false, true,  true ],  "desc": "hats + bass + stabs — intimate" },
+    { "name": "Groove",    "mutes": [false, false, false, false, true,  true ],  "desc": "kick drops in" },
+    { "name": "Build",     "mutes": [false, false, false, false, true,  false],  "desc": "percussion enters" },
+    { "name": "Peak",      "mutes": [false, false, false, false, false, false],  "desc": "everything — full soulful house" },
+    { "name": "Breakdown", "mutes": [true,  true,  false, false, false, true ],  "desc": "strip to bass + chords + pad" },
+    { "name": "Drop",      "mutes": [false, false, false, false, false, false],  "desc": "everything back — big moment" }
+  ]
+}

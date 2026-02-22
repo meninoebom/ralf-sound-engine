@@ -126,191 +126,48 @@
 
 <script>
 // =============================================================================
-// SCENE CONFIG — mirrors gesture-controller.js, edit per piece
+// PERFORMANCE CONFIG — loaded from .perf.json at startup
 // =============================================================================
 
-// ── Gesture Profiles ─────────────────────────────────────────────────────────
-// gesture/1 = ENERGY DOWN — pull back, strip, filter down, hush
-// gesture/2 = ENERGY UP   — add layers, open filter, boost, reveal
-// gesture/3 = STRUCTURE   — scene changes, breakdowns, buildups, resets
+let perfConfig = null;
+let gestures = {};
+let streamDefs = {};
+let stackDefs = {};
+let intentPools = {};
+let signalDefs = {};
+let scenes = [];
+let perfBpm = 120;
+let perfSwing = 0.2;
+let perfSwingSub = "16n";
 
-const gestures = {
-  "/gesture/1": {
-    name: "pull back",
-    streams:  { energy_down: 1, all_movement: 1 },
-    stacks:   { total_moves: 1, pull_back_streak: 1 },
-    intents:  ["strip_energy"],
-    signals:  ["stop"]
-  },
-  "/gesture/2": {
-    name: "push energy",
-    streams:  { energy_up: 1, all_movement: 1 },
-    stacks:   { total_moves: 1, push_streak: 1 },
-    intents:  ["add_energy"],
-    signals:  ["start"]
-  },
-  "/gesture/3": {
-    name: "structure shift",
-    streams:  { structure_rate: 1, all_movement: 1 },
-    stacks:   { total_moves: 1, structure_count: 1 },
-    intents:  ["shift_structure"],
-    signals:  []
-  }
-};
+async function loadPerformance() {
+  const res = await fetch("/perf");
+  perfConfig = await res.json();
 
-// ── Stream Definitions (rate-based, windowed) ────────────────────────────────
+  gestures = perfConfig.gestures;
+  streamDefs = perfConfig.streams;
+  stackDefs = perfConfig.stacks;
+  intentPools = perfConfig.intents;
+  signalDefs = perfConfig.signals;
+  scenes = perfConfig.scenes;
+  perfBpm = perfConfig.bpm || 120;
+  perfSwing = perfConfig.swing || 0;
+  perfSwingSub = perfConfig.swing_subdivision || "16n";
 
-const streamDefs = {
-  // Rapid pull-back gestures → dramatic filter sweep down
-  energy_down: {
-    window_ms: 5000,
-    thresholds: [
-      { above: 6, action: { intent: "frantic_strip" } }
-    ]
-  },
-  // Rapid energy-up gestures → explosive reveal
-  energy_up: {
-    window_ms: 5000,
-    thresholds: [
-      { above: 6, action: { intent: "explosive_build" } }
-    ]
-  },
-  // Rapid structure gestures → bass drop (you're asking for chaos)
-  structure_rate: {
-    window_ms: 5000,
-    thresholds: [
-      { above: 4, action: { intent: "total_reset" } }
-    ]
-  },
-  // Overall movement rate across all gestures
-  all_movement: {
-    window_ms: 5000,
-    thresholds: [
-      { above: 10, action: { intent: "peak_frenzy" } }
-    ]
-  }
-};
+  log(`loaded: ${perfConfig.name} (v${perfConfig.version})`, "action");
+  initState();
+  buildGestureButtons();
+  updateUI();
+}
 
-// ── Stack Definitions (accumulation, no decay) ───────────────────────────────
-
-const stackDefs = {
-  // Total moves: minor shift every 5, major every 15
-  total_moves: {
-    triggers: [
-      { at: 5,  action: { intent: "minor_shift" },  reset: false },
-      { at: 15, action: { intent: "breakthrough" },  reset: true  }
-    ]
-  },
-  // Sustained pull-backs → full breakdown
-  pull_back_streak: {
-    triggers: [
-      { at: 5, action: { intent: "full_breakdown" }, reset: true }
-    ]
-  },
-  // Sustained energy pushes → scene advance
-  push_streak: {
-    triggers: [
-      { at: 5, action: { intent: "scene_advance" }, reset: true }
-    ]
-  },
-  // Structure gesture accumulation → drop
-  structure_count: {
-    triggers: [
-      { at: 3, action: { intent: "structure_payoff" }, reset: true }
-    ]
-  }
-};
-
-// ── Intent Pools (weighted non-deterministic actions) ────────────────────────
-
-const intentPools = {
-  // --- ENERGY DOWN domain (gesture/1 immediate) ---
-  "strip_energy": [
-    { action: "filter_sweep",   args: { freq: 300, duration: 3000 },                weight: 3 },
-    { action: "hush_master",    args: { drop: 0.4, duration: 2500 },                weight: 2 },
-    { action: "mute_track",     args: { track: 5 },                                  weight: 2 },  // kill perc
-    { action: "mute_track",     args: { track: 0 },                                  weight: 1 },  // kill kick
-    { action: "reverb_throw",   args: { track: 3, duration: 4000 },                  weight: 2 },  // drench chords in verb
-  ],
-
-  // --- ENERGY UP domain (gesture/2 immediate) ---
-  "add_energy": [
-    { action: "unmute_track",   args: { track: 0 },                                  weight: 2 },  // bring kick
-    { action: "unmute_track",   args: { track: 5 },                                  weight: 2 },  // bring perc
-    { action: "emphasis_track", args: { track: 2, boost: 0.2, duration: 2000 },      weight: 2 },  // pump sub bass
-    { action: "unmute_track",   args: { track: 4 },                                  weight: 1 },  // reveal pad
-    { action: "timed_unmute",   args: { track: 5, duration: 8000 },                  weight: 1 },  // perc tease
-    { action: "filter_sweep",   args: { freq: 20000, duration: 2000 },               weight: 1 },  // open filter wide
-  ],
-
-  // --- STRUCTURE domain (gesture/3 immediate) ---
-  "shift_structure": [
-    { action: "fire_next_scene",                                                      weight: 3 },
-    { action: "breakdown",      args: { duration: 6000 },                             weight: 2 },
-    { action: "reverb_throw",   args: { track: 4, duration: 5000 },                   weight: 1 },  // pad wash
-  ],
-
-  // --- Stream triggers (rate-based, 6+ in 5s) ---
-  "frantic_strip": [
-    { action: "breakdown",      args: { duration: 8000 },                             weight: 2 },
-    { action: "filter_sweep",   args: { freq: 150, duration: 5000 },                  weight: 2 },
-    { action: "hush_master",    args: { drop: 0.6, duration: 4000 },                  weight: 1 },
-  ],
-  "explosive_build": [
-    { action: "bass_drop",                                                             weight: 2 },
-    { action: "fire_scene",     args: { scene: 3 },                                   weight: 2 },  // jump to Peak
-    { action: "tempo_shift",    args: { bpm: 128, duration: 6000 },                   weight: 1 },
-  ],
-  "total_reset": [
-    { action: "bass_drop",                                                             weight: 2 },
-    { action: "fire_scene",     args: { scene: 4 },                                   weight: 1 },  // Breakdown scene
-    { action: "fire_scene",     args: { scene: 5 },                                   weight: 1 },  // Drop scene
-  ],
-  "peak_frenzy": [
-    { action: "tempo_shift",    args: { bpm: 130, duration: 8000 },                   weight: 2 },
-    { action: "bass_drop",                                                             weight: 1 },
-    { action: "fire_scene",     args: { scene: 3 },                                   weight: 1 },  // force Peak
-  ],
-
-  // --- Stack triggers (accumulation payoffs) ---
-  "minor_shift": [
-    { action: "reverb_throw",   args: { track: 3, duration: 3000 },                   weight: 2 },  // chord wash
-    { action: "emphasis_track", args: { track: 2, boost: 0.25, duration: 2000 },      weight: 2 },  // bass pump
-    { action: "timed_unmute",   args: { track: 4, duration: 6000 },                   weight: 1 },  // pad tease
-    { action: "filter_sweep",   args: { freq: 600, duration: 3000 },                  weight: 1 },
-  ],
-  "breakthrough": [
-    { action: "fire_next_scene",                                                       weight: 3 },
-    { action: "bass_drop",                                                             weight: 2 },
-    { action: "breakdown",      args: { duration: 8000 },                              weight: 1 },
-  ],
-  "full_breakdown": [
-    { action: "breakdown",      args: { duration: 10000 },                             weight: 3 },
-    { action: "filter_sweep",   args: { freq: 200, duration: 6000 },                   weight: 1 },
-  ],
-  "scene_advance": [
-    { action: "fire_next_scene",                                                       weight: 3 },
-    { action: "bass_drop",                                                             weight: 1 },
-  ],
-  "structure_payoff": [
-    { action: "fire_next_scene",                                                       weight: 2 },
-    { action: "breakdown",      args: { duration: 6000 },                              weight: 2 },
-    { action: "bass_drop",                                                             weight: 1 },
-  ]
-};
-
-// ── Signal Map (gated direct commands) ───────────────────────────────────────
-
-const signalMap = {
-  "start": {
-    action: "start_playing",
-    condition: () => !playing
-  },
-  "stop": {
-    action: "stop_playing",
-    condition: () => playing && elapsedMs() > 300000  // only after 5 min
-  }
-};
+// Evaluate a signal condition from data (replaces JS functions)
+function evaluateCondition(cond) {
+  if (!cond) return true;
+  if (cond.state_equals === "playing" && !playing) return false;
+  if (cond.state_equals === "stopped" && playing) return false;
+  if (cond.min_elapsed_ms && elapsedMs() < cond.min_elapsed_ms) return false;
+  return true;
+}
 
 
 // =============================================================================
@@ -532,15 +389,7 @@ const percPattern = new Tone.Sequence((time, hit) => {
 // ── All loops ────────────────────────────────────────────────────────────────
 const loops = [kickLoop, hatLoop, bassLoop, chordProgressionLoop, padLoop, percPattern];
 
-// --- Scenes: progressive build from intimate to full -------------------------
-const scenes = [
-  { name: "Intro",     mutes: [true,  false, false, false, true,  true ], desc: "hats + bass + stabs — intimate" },
-  { name: "Groove",    mutes: [false, false, false, false, true,  true ], desc: "kick drops in" },
-  { name: "Build",     mutes: [false, false, false, false, true,  false], desc: "percussion enters" },
-  { name: "Peak",      mutes: [false, false, false, false, false, false], desc: "everything — full soulful house" },
-  { name: "Breakdown", mutes: [true,  true,  false, false, false, true ], desc: "strip to bass + chords + pad" },
-  { name: "Drop",      mutes: [false, false, false, false, false, false], desc: "everything back — big moment" }
-];
+// Scenes loaded from performance config
 
 function applyScene(idx) {
   currentScene = ((idx % scenes.length) + scenes.length) % scenes.length;
@@ -569,9 +418,9 @@ function setVolume(trackIdx, linear) {
 
 function startPlaying() {
   if (playing) return;
-  Tone.Transport.bpm.value = 120;
-  Tone.Transport.swing = 0.2;       // Soulful swing
-  Tone.Transport.swingSubdivision = "16n";
+  Tone.Transport.bpm.value = perfBpm;
+  Tone.Transport.swing = perfSwing;
+  Tone.Transport.swingSubdivision = perfSwingSub;
   Tone.Transport.start();
   loops.forEach(l => l.start(0));
   applyScene(currentScene);
@@ -742,8 +591,8 @@ function tempoShift(targetBpm, durationMs) {
   log(`tempo shift → ${target} BPM over ${dur}s`, "action");
   // Return to 120 after double the ramp time
   setTimeout(() => {
-    Tone.Transport.bpm.rampTo(120, dur);
-    log("tempo restored → 120 BPM", "action");
+    Tone.Transport.bpm.rampTo(perfBpm, dur);
+    log(`tempo restored → ${perfBpm} BPM`, "action");
   }, dur * 2000);
 }
 
@@ -759,7 +608,6 @@ function initState() {
   for (const name in streamDefs) streamState[name] = [];
   for (const name in stackDefs) stackState[name] = 0;
 }
-initState();
 
 // =============================================================================
 // GESTURE BUTTONS — manual trigger + flash on OSC
@@ -808,8 +656,6 @@ function flashGestureButton(num) {
   btn.classList.add("flash");
   setTimeout(() => btn.classList.remove("flash"), 300);
 }
-
-buildGestureButtons();
 
 function elapsedMs() {
   if (startTime === 0) return 0;
@@ -935,9 +781,9 @@ function weightedRandom(pool) {
 function executeSignals(signals) {
   if (!signals) return;
   for (const signalName of signals) {
-    const def = signalMap[signalName];
+    const def = signalDefs[signalName];
     if (!def) continue;
-    if (def.condition && !def.condition()) continue;
+    if (!evaluateCondition(def.condition)) continue;
     log(`signal ${signalName} -> ${def.action}`, "signal");
     executeAction(def.action, def.args || {});
   }
@@ -1003,7 +849,6 @@ function connectWs() {
     }
   };
 }
-connectWs();
 
 
 // =============================================================================
@@ -1066,9 +911,6 @@ function updateUI() {
 // Periodic UI refresh for elapsed time and stream decay
 setInterval(updateUI, 500);
 
-// Initial UI render
-updateUI();
-
 // Start/stop button
 async function togglePlayback() {
   await Tone.start(); // Required: unlock audio context on user gesture
@@ -1079,6 +921,11 @@ async function togglePlayback() {
   }
   updateUI();
 }
+
+// Boot: load performance config, then connect
+loadPerformance().then(() => {
+  connectWs();
+});
 </script>
 </body>
 </html>

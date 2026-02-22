@@ -42,11 +42,15 @@ function parseOsc(buf) {
 // =============================================================================
 
 const htmlPath = path.join(__dirname, "index.html");
+const perfPath = path.join(__dirname, "soulful-house.perf.json");
 
 const server = http.createServer((req, res) => {
   if (req.url === "/" || req.url === "/index.html") {
     res.writeHead(200, { "Content-Type": "text/html" });
     fs.createReadStream(htmlPath).pipe(res);
+  } else if (req.url === "/perf") {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    fs.createReadStream(perfPath).pipe(res);
   } else {
     res.writeHead(404);
     res.end("Not found");
